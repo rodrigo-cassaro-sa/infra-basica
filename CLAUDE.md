@@ -4,24 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Visão geral
 
-Repositório **base (template) de infraestrutura** da software house: cada novo projeto nasce dele. **1 repositório = 3 serviços EasyPanel, um por branch (`dev`, `hom`, `main`), todos com o mesmo `docker-compose.yml`**. Cada serviço sobe Code Server + Django + Expo + PostgreSQL; o que muda entre eles é só o Ambiente (`.env`). A documentação e o código usam português (settings `LANGUAGE_CODE = "pt-br"`, TZ `America/Sao_Paulo`).
+Repositório **base (template) de infraestrutura** da software house: cada novo projeto nasce dele. **1 repositório = 3 serviços EasyPanel, um por branch (`dev`, `hom`, `main`), todos com o mesmo `docker-compose.yml`**. Cada serviço sobe Django + Expo + PostgreSQL, e o `<projeto>-dev` também o Code Server; o que muda entre eles é só o Ambiente (`.env`). A documentação e o código usam português (settings `LANGUAGE_CODE = "pt-br"`, TZ `America/Sao_Paulo`).
 
 Regras do template:
 - **Stack fixa:** backend sempre Django, frontend sempre Expo (mobile + web). Não introduzir outros frameworks de backend/frontend.
 - **Um compose, um `.env` por ambiente.** Nada de arquivo ou prefixo por ambiente: toda diferença entre DEV, HOM e PROD é variável, com o mesmo nome nos três. Variável nova entra no `docker-compose.yml` com default (`${VAR:-padrão}`) e nos três `.env.<ambiente>.example`.
-- **DEV, HOM e PROD são totalmente separados:** cada serviço EasyPanel tem rede, volumes, banco, segredos e Code Server próprios. Nunca compartilhar banco ou segredos entre ambientes.
+- **DEV, HOM e PROD são totalmente separados:** cada serviço EasyPanel tem rede, volumes, banco e segredos próprios. Nunca compartilhar banco ou segredos entre ambientes.
 - **Uma branch por ambiente: `dev` → DEV, `hom` → HOM, `main` → PROD.** Trabalho em `feat|fix/H-xxx-slug` criada a partir de `dev` → PR para `dev` → promoção por PR `dev → hom` (deploy HOM, homologação) → PR `hom → main` (deploy PROD, só após "Aprovo publicação"). Hotfix: `hotfix/slug` a partir de `main` → PR para `main` → back-merge `main → hom → dev`. Nada chega a `main` sem ter passado por `hom`, exceto hotfix. Este modelo **substitui** o `develop`/`main` descrito nas skills `git-deploy` e `devops`.
 
 Estrutura:
 - `backend/` — Django 5.2 + PostgreSQL 17 (psycopg 3), gunicorn, django-cors-headers. Projeto em `config/`, app inicial `core/` (expõe `GET /api/health/`). `docker-entrypoint.sh` escolhe o modo de execução por `RUN_MODE`.
 - `frontend/` — Expo SDK 57 / React Native 0.86 / React 19.2, TypeScript 6, com suporte web via Metro (`react-native-web`). Expo Router (`main: expo-router/entry`): rotas finas em `src/app/` que só reexportam a screen de `src/features/<feature>/screens/`; import absoluto `@/` → `src/`; typed routes ligadas. Padrão completo na skill `expo-app`. Um `Dockerfile` com alvos `dev` (Metro) e `server` (export web + Nginx).
 - `coder/` — imagem do Code Server (Node 22, Python, pnpm, EAS CLI, gh, Claude Code, psql). É onde o Claude Code roda.
-- `docker-compose.yml` — o único compose (serviços `workspace-init`, `postgres`, `django`, `expo`, `code-server`); `docker-compose.local.yml` só publica portas para rodar fora do EasyPanel.
+- `docker-compose.yml` — o único compose (serviços `postgres`, `django`, `expo` e, no profile `coder`, `workspace-init` + `code-server`); `docker-compose.local.yml` só publica portas para rodar fora do EasyPanel.
 - `.env.dev.example`, `.env.hom.example`, `.env.prod.example` — o Ambiente de cada serviço EasyPanel.
 
 ## Como cada ambiente roda (importante)
 
-O Claude Code roda **dentro do container `code-server`**, em `/home/coder/workspace`, que é o volume `coder_workspace` — uma **cópia privada** da branch daquele serviço, feita uma única vez pelo `workspace-init` (nas execuções seguintes ele não sobrescreve nada). Cada ambiente tem o seu Code Server e o seu workspace.
+O Code Server existe **só no DEV**: `code-server` e `workspace-init` estão no profile `coder`, ligado por `COMPOSE_PROFILES=coder` no `.env.dev.example` (vazio em HOM/PROD). O Claude Code roda **dentro do container `code-server`**, em `/home/coder/workspace`, que é o volume `coder_workspace` — uma **cópia privada** da branch `dev`, feita uma única vez pelo `workspace-init` (nas execuções seguintes ele não sobrescreve nada). `RUN_MODE=dev` exige esse profile ligado.
 
 `RUN_MODE` decide o que `django` e `expo` executam:
 
@@ -30,9 +30,9 @@ O Claude Code roda **dentro do container `code-server`**, em `/home/coder/worksp
 | `dev` | DEV | `runserver` com autoreload | Metro (`expo start --web`) com hot reload | workspace do Code Server |
 | `server` | HOM, PROD | `migrate` + `collectstatic` + gunicorn | `expo export --platform web` servido por Nginx | checkout da branch (build da imagem) |
 
-- Em `dev`, editar no Code Server aparece na hora no DEV. Em `server`, editar no Code Server **não** muda o que está no ar: só commit + PR na branch + redeploy.
+- Em `dev`, editar no Code Server aparece na hora no DEV. HOM e PROD só mudam por PR na branch + redeploy.
 - Em `server`, `API_URL` é embutida **no build** do Expo: mudou, reimplante.
-- Os dois modos respondem nas mesmas portas: `django:8000`, `expo:8081`, `code-server:8080`.
+- Os dois modos respondem nas mesmas portas: `django:8000`, `expo:8081` (e `code-server:8080` no DEV).
 - Git/GitHub do code-server: `coder/entrypoint.sh` aplica `GIT_USER_NAME`/`GIT_USER_EMAIL` e, com `GH_TOKEN`, configura o `gh` como credential helper do Git. Sem essas variáveis, `coder/git-bootstrap.sh` faz o login interativo no primeiro terminal.
 - Não há Docker CLI nem Django instalados dentro do code-server; os hostnames dos serviços Compose (`postgres`, `django`, `expo`) resolvem pela rede interna do ambiente. `make` / `scripts/*.sh` usam `docker compose` e rodam no host.
 
@@ -107,6 +107,6 @@ Atenção: `devops` e `git-deploy` descrevem imagens no GHCR, GitHub Actions e b
 ## Segurança / operação
 
 - O PostgreSQL não publica porta; só a rede interna do ambiente o alcança.
-- O Code Server de HOM e PROD alcança o banco do próprio ambiente: `CODER_PASSWORD` forte em todos.
+- Code Server desligado em HOM e PROD (`COMPOSE_PROFILES` vazio). Ligar lá é exceção: ele alcança o banco do ambiente.
 - O Compose nunca deve montar `./` como gravável no code-server (evita problemas de `dubious ownership` no checkout do EasyPanel — ver `WORKSPACE-EASYPANEL.md`).
 - Domínios e portas internas por serviço estão em `EASYPANEL.md`.
