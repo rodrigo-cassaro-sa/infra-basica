@@ -10,20 +10,20 @@ Regras do template:
 - **Stack fixa:** backend sempre Django, frontend sempre Expo (mobile + web). Não introduzir outros frameworks de backend/frontend.
 - **Code Server é o ambiente de programação** do projeto; o código é editado ali e roda no DEV.
 - **DEV, HOM e PROD são totalmente separados:** cada um tem seu próprio PostgreSQL, Django e Expo, com banco, volume, segredos e variáveis próprios. Nunca compartilhar banco ou segredos entre ambientes. Ao adicionar um serviço ou variável, replicar nos três ambientes, mantendo o padrão de prefixos `DEV_`/`HOM_`/`PROD_`.
-- Fluxo de promoção: desenvolvimento em DEV (Code Server) → validação em HOM → publicação em PROD, sempre via Git + deploy no EasyPanel.
+- **Branch por ambiente:** HOM sai de `develop`, PROD sai de `main`. Trabalho em `feat|fix/H-xxx-slug` criada a partir de `develop` → PR para `develop` (HOM) → release PR `develop → main` (PROD). Nada vai para `main` sem passar por HOM, exceto hotfix (skill `git-deploy`).
 
 Estrutura:
 - `backend/` — Django 5.2 + PostgreSQL 17 (psycopg 3), gunicorn, django-cors-headers. Projeto em `config/`, app inicial `core/` (expõe `GET /api/health/`).
-- `frontend/` — Expo SDK 57 / React Native 0.86 / React 19.2, TypeScript 6, com suporte web via Metro (`react-native-web`). Ponto de entrada `index.js` → `App.tsx`.
+- `frontend/` — Expo SDK 57 / React Native 0.86 / React 19.2, TypeScript 6, com suporte web via Metro (`react-native-web`). Expo Router (`main: expo-router/entry`): rotas finas em `src/app/` que só reexportam a screen de `src/features/<feature>/screens/`; import absoluto `@/` → `src/`; typed routes ligadas. Padrão completo na skill `expo-app`.
 - `coder/` — imagem do Code Server (Node 22, Python, pnpm, EAS CLI, gh, Claude Code, psql). É onde o Claude Code roda.
-- `docker-compose.yml` — define todos os serviços; `docker-compose.local.yml` só publica portas para testes fora do EasyPanel.
+- `docker-compose.dev.yml` / `.hom.yml` / `.prod.yml` — um arquivo por ambiente; cada um é um serviço Compose próprio no EasyPanel (`<projeto>-dev` e `<projeto>-hom` na branch `develop`, `<projeto>-prod` na `main`). `docker-compose.yml` só faz `include` dos três para rodar tudo junto localmente; `docker-compose.local.yml` publica portas. Serviço novo entra no arquivo do ambiente, replicado nos três.
 
 ## Arquitetura do workspace (importante)
 
 O Claude Code roda **dentro do container `code-server`**, em `/home/coder/workspace`, que é o volume `coder_workspace` — uma **cópia privada** do repositório feita uma única vez pelo serviço `workspace-init` (nas execuções seguintes ele não sobrescreve nada).
 
 - `django-dev` e `expo-dev` montam esse **mesmo volume**: edições aqui aparecem imediatamente no DEV (`runserver` com autoreload e Metro com hot reload). `django-dev` roda `migrate` ao iniciar.
-- `django-hom`/`django-prod` e `expo-hom`/`expo-prod` são construídos a partir do checkout do EasyPanel/Git, **não** deste workspace. Para chegar a HOM/PROD é preciso `git push` + redeploy no EasyPanel.
+- `django-hom`/`expo-hom` são construídos do checkout da branch `develop` e `django-prod`/`expo-prod` da `main`, **não** deste workspace. Para chegar a HOM é preciso PR mesclado em `develop` + deploy de `<projeto>-hom`; para PROD, release PR `develop → main` + deploy de `<projeto>-prod`.
 - HOM/PROD do frontend são build estático (`expo export --platform web`) servido por Nginx; `EXPO_PUBLIC_API_URL` é embutida **no build** via build arg (`HOM_API_URL`/`PROD_API_URL`), então mudá-la exige rebuild.
 - Git/GitHub do code-server: `coder/entrypoint.sh` aplica `GIT_USER_NAME`/`GIT_USER_EMAIL` e, com `GH_TOKEN`, configura o `gh` como credential helper do Git. Sem essas variáveis, `coder/git-bootstrap.sh` faz o login interativo no primeiro terminal.
 - Não há Docker CLI nem Django instalados dentro do code-server; os hostnames dos serviços Compose (ex.: `postgres-dev`) resolvem pela rede interna. Os comandos `make` / `scripts/*.sh` usam `docker compose` e devem ser executados no host.

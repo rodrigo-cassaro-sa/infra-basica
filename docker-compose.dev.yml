@@ -1,0 +1,160 @@
+# ==========================================================
+# AMBIENTE DEV — Code Server + Django DEV + Expo DEV
+# EasyPanel: serviço Compose "<projeto>-dev", branch develop.
+# O código do DEV é o workspace do Code Server (volume
+# coder_workspace), não o checkout do EasyPanel: a branch só
+# alimenta a cópia inicial do workspace.
+# ==========================================================
+
+services:
+  # ========================================================
+  # WORKSPACE PRIVADO DE DESENVOLVIMENTO
+  # Copia o checkout do EasyPanel UMA VEZ para um volume.
+  # Nunca altera dono/permissões do repositório do EasyPanel.
+  # ========================================================
+  workspace-init:
+    image: alpine:3.20
+    restart: "no"
+    command: >
+      sh -c '
+        set -eu;
+        if [ ! -d /workspace/.git ]; then
+          echo "Inicializando workspace privado...";
+          cp -a /seed/. /workspace/;
+        else
+          echo "Workspace já inicializado; mantendo alterações locais.";
+        fi;
+        chown -R 1000:1000 /workspace;
+      '
+    volumes:
+      - ./:/seed:ro
+      - coder_workspace:/workspace
+
+  # ========================================================
+  # POSTGRESQL - DEV
+  # ========================================================
+  postgres-dev:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DEV_DB_NAME:-app_dev}
+      POSTGRES_USER: ${DEV_DB_USER:-app_dev}
+      POSTGRES_PASSWORD: ${DEV_DB_PASSWORD:-dev-change-me}
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DEV_DB_USER:-app_dev} -d ${DEV_DB_NAME:-app_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ========================================================
+  # DJANGO - DEV
+  # Usa o MESMO workspace privado do Code Server.
+  # Alterações feitas no Code Server aparecem no DEV.
+  # ========================================================
+  django-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /workspace/backend
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY_DEV:-dev-insecure-change-me}
+      DJANGO_ALLOWED_HOSTS: ${DEV_ALLOWED_HOSTS:-*}
+      CORS_ALLOWED_ORIGINS: ${DEV_CORS_ALLOWED_ORIGINS:-}
+      DB_HOST: postgres-dev
+      DB_PORT: 5432
+      DB_NAME: ${DEV_DB_NAME:-app_dev}
+      DB_USER: ${DEV_DB_USER:-app_dev}
+      DB_PASSWORD: ${DEV_DB_PASSWORD:-dev-change-me}
+      TZ: ${TZ:-America/Sao_Paulo}
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - coder_workspace:/workspace
+    expose:
+      - "8000"
+    depends_on:
+      workspace-init:
+        condition: service_completed_successfully
+      postgres-dev:
+        condition: service_healthy
+
+  # ========================================================
+  # EXPO - DEV (Metro + Web)
+  # Usa o MESMO workspace privado do Code Server.
+  # ========================================================
+  expo-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    working_dir: /workspace/frontend
+    environment:
+      NODE_ENV: development
+      CI: "1"
+      EXPO_PUBLIC_API_URL: ${DEV_API_URL:-}
+      TZ: ${TZ:-America/Sao_Paulo}
+    command: >
+      sh -c "npm install && npx expo start --web --port 8081"
+    volumes:
+      - coder_workspace:/workspace
+      - expo_node_modules:/workspace/frontend/node_modules
+    expose:
+      - "8081"
+    depends_on:
+      workspace-init:
+        condition: service_completed_successfully
+
+  # ========================================================
+  # CODE SERVER - UM POR PROJETO
+  # NUNCA monta ./: como workspace gravável.
+  # ========================================================
+  code-server:
+    build:
+      context: ./coder
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      PASSWORD: ${CODER_PASSWORD:-change-me-coder}
+      TZ: ${TZ:-America/Sao_Paulo}
+      CLAUDE_CONFIG_DIR: /home/coder/.claude
+      GIT_CONFIG_GLOBAL: /home/coder/.config/git/config
+      GIT_USER_NAME: ${GIT_USER_NAME:-}
+      GIT_USER_EMAIL: ${GIT_USER_EMAIL:-}
+      GH_TOKEN: ${GH_TOKEN:-}
+    volumes:
+      - coder_workspace:/home/coder/workspace
+      - coder_config:/home/coder/.config
+      - coder_local:/home/coder/.local
+      - coder_claude:/home/coder/.claude
+      - coder_ssh:/home/coder/.ssh
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      workspace-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_dev_data:
+  expo_node_modules:
+
+  # Workspace privado do desenvolvimento.
+  coder_workspace:
+
+  # Preferências, extensões e autenticações persistentes.
+  coder_config:
+  coder_local:
+  coder_claude:
+  coder_ssh:

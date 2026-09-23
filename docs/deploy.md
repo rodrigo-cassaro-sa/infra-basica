@@ -9,17 +9,21 @@
 
 - Remoto: [https://github.com/<conta>/<repo>.git] · visibilidade: privado
 - Estrutura: monorepo do template `infra-basica` — `backend/` (Django), `frontend/` (Expo), `coder/` (Code Server), `docs/`, `scripts/`
-- Branches: PENDENTE (ver "Pipeline")
+- Branches: `develop` → hom · `main` → prod · trabalho `feat|fix/H-xxx-slug` · `hotfix/slug`
+- Branch padrão no GitHub: `develop` · protegidas: `main` e `develop` (PR obrigatório)
 - Line endings: LF
 
 ## Ambientes
 
-Um único serviço Compose no EasyPanel (`docker-compose.yml`) com os três ambientes isolados.
-Variáveis no Ambiente do EasyPanel, com prefixo `DEV_` / `HOM_` / `PROD_` (modelo em `.env.example`).
+Um serviço Compose no EasyPanel por ambiente, cada um com rede, volumes e variáveis próprios.
+Variáveis no Ambiente de cada serviço, com prefixo `DEV_` / `HOM_` / `PROD_` (modelo em `.env.example`).
 
 | | dev | hom | prod |
 |---|---|---|---|
-| Código | workspace do Code Server (volume `coder_workspace`) | checkout do EasyPanel | checkout do EasyPanel |
+| Serviço EasyPanel | `[projeto]-dev` | `[projeto]-hom` | `[projeto]-prod` |
+| Arquivo Compose | `docker-compose.dev.yml` | `docker-compose.hom.yml` | `docker-compose.prod.yml` |
+| Branch | `develop` (só a cópia inicial) | `develop` | `main` |
+| Código | workspace do Code Server (volume `coder_workspace`) | checkout de `develop` | checkout de `main` |
 | API | https://[api-dev-projeto.dominio] | https://[api-hom-projeto.dominio] | https://[api-projeto.dominio] |
 | Web | https://[dev-projeto.dominio] | https://[hom-projeto.dominio] | https://[projeto.dominio] |
 | Code Server | https://[coder-projeto.dominio] | — | — |
@@ -38,9 +42,10 @@ Variáveis no Ambiente do EasyPanel, com prefixo `DEV_` / `HOM_` / `PROD_` (mode
 
 ## Pipeline
 
-- Forma atual: redeploy do Compose no EasyPanel a partir do repositório.
-- PENDENTE: definir a promoção entre hom e prod (branch/ref de cada um).
-- PENDENTE: adotar os workflows da `devops` (ci/deploy/rollback) ou manter o redeploy manual.
+- Forma atual: **promoção por branch** — o EasyPanel constrói cada ambiente a partir da branch dele.
+- hom: deploy de `[projeto]-hom` após merge em `develop` (automático por webhook: PENDENTE decidir).
+- prod: release PR `develop → main` aprovado + deploy manual de `[projeto]-prod`.
+- PENDENTE: adotar os workflows da `devops` (ci/deploy/rollback com imagem imutável no GHCR).
 
 ## Aplicativo
 
