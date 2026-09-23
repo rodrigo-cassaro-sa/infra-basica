@@ -1,0 +1,31 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+staticfiles/
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Backups
+backups/*.sql
+backups/*.dump
+!backups/.gitkeep
