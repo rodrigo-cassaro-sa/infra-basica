@@ -10,20 +10,20 @@ Regras do template:
 - **Stack fixa:** backend sempre Django, frontend sempre Expo (mobile + web). Não introduzir outros frameworks de backend/frontend.
 - **Code Server é o ambiente de programação** do projeto; o código é editado ali e roda no DEV.
 - **DEV, HOM e PROD são totalmente separados:** cada um tem seu próprio PostgreSQL, Django e Expo, com banco, volume, segredos e variáveis próprios. Nunca compartilhar banco ou segredos entre ambientes. Ao adicionar um serviço ou variável, replicar nos três ambientes, mantendo o padrão de prefixos `DEV_`/`HOM_`/`PROD_`.
-- **Branch por ambiente:** HOM sai de `develop`, PROD sai de `main`. Trabalho em `feat|fix/H-xxx-slug` criada a partir de `develop` → PR para `develop` (HOM) → release PR `develop → main` (PROD). Nada vai para `main` sem passar por HOM, exceto hotfix (skill `git-deploy`).
+- **Uma branch por ambiente: `dev` → DEV, `hom` → HOM, `main` → PROD.** Trabalho em `feat|fix/H-xxx-slug` criada a partir de `dev` → PR para `dev` → promoção por PR `dev → hom` (deploy HOM, homologação) → PR `hom → main` (deploy PROD, só após "Aprovo publicação"). Hotfix: `hotfix/slug` a partir de `main` → PR para `main` → back-merge `main → hom → dev`. Nada chega a `main` sem ter passado por `hom`, exceto hotfix. Este modelo **substitui** o `develop`/`main` descrito nas skills `git-deploy` e `devops`.
 
 Estrutura:
 - `backend/` — Django 5.2 + PostgreSQL 17 (psycopg 3), gunicorn, django-cors-headers. Projeto em `config/`, app inicial `core/` (expõe `GET /api/health/`).
 - `frontend/` — Expo SDK 57 / React Native 0.86 / React 19.2, TypeScript 6, com suporte web via Metro (`react-native-web`). Expo Router (`main: expo-router/entry`): rotas finas em `src/app/` que só reexportam a screen de `src/features/<feature>/screens/`; import absoluto `@/` → `src/`; typed routes ligadas. Padrão completo na skill `expo-app`.
 - `coder/` — imagem do Code Server (Node 22, Python, pnpm, EAS CLI, gh, Claude Code, psql). É onde o Claude Code roda.
-- `docker-compose.dev.yml` / `.hom.yml` / `.prod.yml` — um arquivo por ambiente; cada um é um serviço Compose próprio no EasyPanel (`<projeto>-dev` e `<projeto>-hom` na branch `develop`, `<projeto>-prod` na `main`). `docker-compose.yml` só faz `include` dos três para rodar tudo junto localmente; `docker-compose.local.yml` publica portas. Serviço novo entra no arquivo do ambiente, replicado nos três.
+- `docker-compose.dev.yml` / `.hom.yml` / `.prod.yml` — um arquivo por ambiente; cada um é um serviço Compose próprio no EasyPanel (`<projeto>-dev` na branch `dev`, `<projeto>-hom` na `hom`, `<projeto>-prod` na `main`). `docker-compose.yml` só faz `include` dos três para rodar tudo junto localmente; `docker-compose.local.yml` publica portas. Serviço novo entra no arquivo do ambiente, replicado nos três.
 
 ## Arquitetura do workspace (importante)
 
 O Claude Code roda **dentro do container `code-server`**, em `/home/coder/workspace`, que é o volume `coder_workspace` — uma **cópia privada** do repositório feita uma única vez pelo serviço `workspace-init` (nas execuções seguintes ele não sobrescreve nada).
 
 - `django-dev` e `expo-dev` montam esse **mesmo volume**: edições aqui aparecem imediatamente no DEV (`runserver` com autoreload e Metro com hot reload). `django-dev` roda `migrate` ao iniciar.
-- `django-hom`/`expo-hom` são construídos do checkout da branch `develop` e `django-prod`/`expo-prod` da `main`, **não** deste workspace. Para chegar a HOM é preciso PR mesclado em `develop` + deploy de `<projeto>-hom`; para PROD, release PR `develop → main` + deploy de `<projeto>-prod`.
+- `django-hom`/`expo-hom` são construídos do checkout da branch `hom` e `django-prod`/`expo-prod` da `main`, **não** deste workspace. O DEV roda o workspace; a branch `dev` só alimenta a cópia inicial dele. Para chegar a HOM: PR `dev → hom` + deploy de `<projeto>-hom`; para PROD: PR `hom → main` + deploy de `<projeto>-prod`.
 - HOM/PROD do frontend são build estático (`expo export --platform web`) servido por Nginx; `EXPO_PUBLIC_API_URL` é embutida **no build** via build arg (`HOM_API_URL`/`PROD_API_URL`), então mudá-la exige rebuild.
 - Git/GitHub do code-server: `coder/entrypoint.sh` aplica `GIT_USER_NAME`/`GIT_USER_EMAIL` e, com `GH_TOKEN`, configura o `gh` como credential helper do Git. Sem essas variáveis, `coder/git-bootstrap.sh` faz o login interativo no primeiro terminal.
 - Não há Docker CLI nem Django instalados dentro do code-server; os hostnames dos serviços Compose (ex.: `postgres-dev`) resolvem pela rede interna. Os comandos `make` / `scripts/*.sh` usam `docker compose` e devem ser executados no host.
@@ -94,7 +94,7 @@ O projeto segue a DAH (Desenvolvimento Assistido por Histórias). Trilha, gates 
 
 `.claude/skills/` traz as skills genéricas de desenvolvimento da casa (versionadas no template, herdadas por todo projeto novo): backend Django (`backend-core`, `backend-api`, `backend-async`, `backend-integrations`, `backend-ai-mcp`), frontend Expo (`expo-app`, `ux-ui`, `frontend-web`), método DAH (`dah-historia`, `dah-documentacao`, `project-governance`, `artifact-analysis`) e transversais (`security`, `testing-quality`, `devops`, `git-deploy`). Skills específicas de um aplicativo ficam só no repositório do app.
 
-Atenção: `devops` e `git-deploy` descrevem um fluxo com imagens no GHCR, GitHub Actions e branches `develop`→HOM / `main`→PROD. Este template hoje faz o build de todos os ambientes a partir do checkout do EasyPanel, em um único Compose. Ao seguir essas skills, confirmar com o usuário qual modelo de deploy vale para o projeto.
+Atenção: `devops` e `git-deploy` descrevem imagens no GHCR, GitHub Actions e branches `develop`→HOM / `main`→PROD. Neste template valem as branches `dev`/`hom`/`main` e o build de cada ambiente pelo EasyPanel a partir da própria branch (ver `docs/deploy.md`). Adotar pipeline com imagens é decisão a registrar no projeto.
 
 ## Segurança / operação
 

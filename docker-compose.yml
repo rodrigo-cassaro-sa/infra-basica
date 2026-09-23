@@ -6,8 +6,8 @@ name: ${COMPOSE_PROJECT_NAME:-app}
 # No EasyPanel cada ambiente é um serviço Compose próprio,
 # apontando para o arquivo e a branch do ambiente:
 #
-#   <projeto>-dev   docker-compose.dev.yml    branch develop
-#   <projeto>-hom   docker-compose.hom.yml    branch develop
+#   <projeto>-dev   docker-compose.dev.yml    branch dev
+#   <projeto>-hom   docker-compose.hom.yml    branch hom
 #   <projeto>-prod  docker-compose.prod.yml   branch main
 #
 # Local:

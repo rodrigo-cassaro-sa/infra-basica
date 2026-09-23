@@ -1,7 +1,7 @@
 # ==========================================================
 # AMBIENTE PROD — produção
 # EasyPanel: serviço Compose "<projeto>-prod", branch main.
-# Chega aqui só o release PR develop → main.
+# Chega aqui só a promoção hom → main, após homologação.
 # ==========================================================
 
 services:
