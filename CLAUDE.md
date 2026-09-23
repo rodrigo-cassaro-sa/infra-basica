@@ -75,6 +75,21 @@ make backup-dev | backup-hom | backup-prod   # pg_dump para backups/
 
 Health checks: Django em `/api/health/`, Nginx do Expo em `/healthz`, Code Server em `/healthz`.
 
+## Documentação do projeto (método DAH)
+
+O projeto segue a DAH (Desenvolvimento Assistido por Histórias). Trilha, gates humanos, numeração, propriedade dos documentos e Definitions of Done estão no `AGENTS.md`, que vale para todo trabalho no repositório:
+
+@AGENTS.md
+
+
+`docs/` traz os **modelos em branco** da documentação que as skills leem e mantêm. No repositório do app eles são preenchidos; no template ficam vazios.
+
+- `docs/produto.md` (visão, capítulos, papéis, vocabulário) e `docs/historias/` (`indice.md` + `H-xxx-*.md`): especificação funcional.
+- Derivados das Histórias (`dah-documentacao`): `regras-de-negocio.md`, `modelo-de-dados.md`, `mapa-de-fluxos.md`, `mapa-de-telas.md`, `contratos-de-api.md`, `mapa-de-decisoes.md`.
+- Governança e qualidade: `cronograma.md`, `diario-de-bordo.md`, `mapa-de-testes.md`; interface: `guia-visual.md`; operação: `deploy.md`.
+- `docs/prompts/`: prompts do fluxo DAH, trilha padrão P-01 a P-06 (backlog → história → documentação → interface → implementação → homologação/publicação) e trilha de artefatos PA-01 a PA-03 (analisar código gerado por IA).
+- D-001 a D-005 em `mapa-de-decisoes.md` são decisões da casa; a numeração própria de cada projeto começa em D-006.
+
 ## Skills do template
 
 `.claude/skills/` traz as skills genéricas de desenvolvimento da casa (versionadas no template, herdadas por todo projeto novo): backend Django (`backend-core`, `backend-api`, `backend-async`, `backend-integrations`, `backend-ai-mcp`), frontend Expo (`expo-app`, `ux-ui`, `frontend-web`), método DAH (`dah-historia`, `dah-documentacao`, `project-governance`, `artifact-analysis`) e transversais (`security`, `testing-quality`, `devops`, `git-deploy`). Skills específicas de um aplicativo ficam só no repositório do app.
