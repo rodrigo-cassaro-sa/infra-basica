@@ -1,0 +1,72 @@
+# ==========================================================
+# AMBIENTE PROD — produção
+# EasyPanel: serviço Compose "<projeto>-prod", branch main.
+# Chega aqui só o release PR develop → main.
+# ==========================================================
+
+services:
+  # ========================================================
+  # POSTGRESQL - PROD
+  # ========================================================
+  postgres-prod:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PROD_DB_NAME:-app_prod}
+      POSTGRES_USER: ${PROD_DB_USER:-app_prod}
+      POSTGRES_PASSWORD: ${PROD_DB_PASSWORD:-prod-change-me}
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PROD_DB_USER:-app_prod} -d ${PROD_DB_NAME:-app_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ========================================================
+  # DJANGO - PROD
+  # Usa o código implantado pelo EasyPanel/Git.
+  # ========================================================
+  django-prod:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY_PROD:-prod-insecure-change-me}
+      DJANGO_ALLOWED_HOSTS: ${PROD_ALLOWED_HOSTS:-*}
+      CORS_ALLOWED_ORIGINS: ${PROD_CORS_ALLOWED_ORIGINS:-}
+      DB_HOST: postgres-prod
+      DB_PORT: 5432
+      DB_NAME: ${PROD_DB_NAME:-app_prod}
+      DB_USER: ${PROD_DB_USER:-app_prod}
+      DB_PASSWORD: ${PROD_DB_PASSWORD:-prod-change-me}
+      TZ: ${TZ:-America/Sao_Paulo}
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${PROD_GUNICORN_WORKERS:-3} --timeout ${PROD_GUNICORN_TIMEOUT:-60}"
+    expose:
+      - "8000"
+    depends_on:
+      postgres-prod:
+        condition: service_healthy
+
+  # ========================================================
+  # EXPO WEB - PROD
+  # Build estático a partir do checkout do EasyPanel/Git.
+  # ========================================================
+  expo-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.web
+      args:
+        EXPO_PUBLIC_API_URL: ${PROD_API_URL:-https://api.exemplo.com}
+    restart: unless-stopped
+    expose:
+      - "80"
+
+volumes:
+  postgres_prod_data:

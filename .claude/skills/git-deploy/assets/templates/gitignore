@@ -1,0 +1,50 @@
+# Dependências e build
+node_modules/
+dist/
+web-build/
+.expo/
+expo-env.d.ts
+
+# Nativo gerado (CNG / prebuild) — só versione se o projeto NÃO usa CNG
+android/
+ios/
+
+# Segredos — nunca versionar
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+credentials.json
+
+# Backend (Django)
+.venv/
+__pycache__/
+*.pyc
+staticfiles/
+media/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.dump
+
+# Testes e cobertura
+coverage/
+
+# Claude Code: config local é pessoal (as skills do projeto entram)
+.claude/settings.local.json
+
+# Sistema e temporários
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+*.log
+~$*

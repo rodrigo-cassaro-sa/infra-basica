@@ -15,7 +15,10 @@ Este repositório é um **molde para cada novo projeto** da software house. A id
 ├── coder/                 # Code Server + Claude Code + GitHub CLI
 ├── scripts/               # operação/backup
 ├── backups/
-├── docker-compose.yml     # EasyPanel / servidor
+├── docker-compose.dev.yml   # EasyPanel <projeto>-dev  (branch develop)
+├── docker-compose.hom.yml   # EasyPanel <projeto>-hom  (branch develop)
+├── docker-compose.prod.yml  # EasyPanel <projeto>-prod (branch main)
+├── docker-compose.yml       # inclui os três (uso local)
 ├── docker-compose.local.yml
 ├── .env.example
 ├── EASYPANEL.md
@@ -40,7 +43,7 @@ PROD
 ├── django-prod
 └── expo-prod (build estático + Nginx)
 
-DESENVOLVIMENTO
+DESENVOLVIMENTO (serviço DEV)
 └── code-server
     ├── workspace = /home/coder/workspace
     ├── Português (Brasil)
@@ -56,10 +59,10 @@ DESENVOLVIMENTO
 
 ## Primeiro uso no servidor
 
-1. Crie um novo repositório a partir deste template.
-2. Aponte um serviço Compose do EasyPanel para o novo repositório.
-3. Use `/` como caminho de build e `docker-compose.yml` como arquivo Compose.
-4. Copie `.env.example` para as variáveis de ambiente do EasyPanel.
+1. Crie um novo repositório a partir deste template e crie a branch `develop` a partir da `main`.
+2. Crie três serviços Compose no EasyPanel (`<projeto>-dev`, `<projeto>-hom`, `<projeto>-prod`), cada um com seu arquivo e sua branch — ver `EASYPANEL.md`.
+3. Use `/` como caminho de build.
+4. Preencha as variáveis de cada ambiente a partir de `.env.example`.
 5. Troque todas as senhas e chaves.
 6. Implante.
 7. Cadastre os domínios conforme `EASYPANEL.md`.
@@ -113,19 +116,17 @@ O fluxo esperado é:
 ```text
 Template
    ↓
-Novo repositório
+Novo repositório (main + develop)
    ↓
-EasyPanel
-   ↓
-Deploy do Compose
+EasyPanel: <projeto>-dev, <projeto>-hom, <projeto>-prod
    ↓
 Code Server daquele projeto
    ↓
-Desenvolvimento DEV
+Desenvolvimento DEV (branch feat/H-xxx a partir de develop)
    ↓
-Validação HOM
+PR → develop → deploy HOM → validação
    ↓
-Publicação PROD
+Release PR develop → main → deploy PROD
 ```
 
 ## Segurança

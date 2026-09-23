@@ -1,0 +1,133 @@
+# .github/workflows/deploy.yml — OPS-01: develop → hom (automático) · main → prod (aprovação)
+#
+# Pré-requisitos no GitHub:
+#   Environments "hom" (branch develop) e "prod" (branch main + required reviewers)
+#   Em CADA environment, os mesmos nomes:
+#     secrets: EASYPANEL_HOOK_API, EASYPANEL_HOOK_WORKER, EASYPANEL_HOOK_BEAT, EASYPANEL_HOOK_WEB
+#              EXPO_TOKEN (se houver app nativo)
+#     vars:    API_URL (https://api[.hom].produto.com.br)  WEB_URL (https://app[.hom].produto.com.br)
+#   Copiar assets/workflows/scripts/*.sh para .github/scripts/
+name: deploy
+on:
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false   # nunca interromper deploy no meio
+
+env:
+  API_IMAGE: ghcr.io/${{ github.repository }}-api
+  WEB_IMAGE: ghcr.io/${{ github.repository }}-web
+  TARGET: ${{ github.ref_name == 'main' && 'prod' || 'hom' }}
+
+jobs:
+  gates:
+    uses: ./.github/workflows/ci.yml   # mesmos gates do PR, de novo no commit que vai sair
+
+  images:
+    needs: gates
+    runs-on: ubuntu-latest
+    permissions: {contents: read, packages: write}
+    outputs:
+      api_tree: ${{ steps.tree.outputs.api }}
+      web_tree: ${{ steps.tree.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
+      - id: tree
+        name: Identidade do conteúdo (tree hash por componente)
+        run: |
+          echo "api=$(git rev-parse HEAD:backend)" >> "$GITHUB_OUTPUT"
+          echo "web=$(git rev-parse HEAD:app)" >> "$GITHUB_OUTPUT"
+      - name: Imagem da API (reusa se já existe)
+        run: .github/scripts/ensure-image.sh "$API_IMAGE" "${{ steps.tree.outputs.api }}" backend
+      - name: Imagem do web (reusa se já existe)
+        run: .github/scripts/ensure-image.sh "$WEB_IMAGE" "${{ steps.tree.outputs.web }}" app
+
+  deploy:
+    needs: images
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || 'hom' }}   # prod pausa aqui para aprovação
+    permissions: {packages: write}
+    env:
+      API_TREE: ${{ needs.images.outputs.api_tree }}
+      WEB_TREE: ${{ needs.images.outputs.web_tree }}
+      HAS_EXPO: ${{ secrets.EXPO_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
+
+      - id: changed
+        name: O que mudou em relação ao que está no ar
+        run: |
+          live_api=$(.github/scripts/current-release.sh "${{ vars.API_URL }}/health/live/")
+          live_web=$(.github/scripts/current-release.sh "${{ vars.WEB_URL }}/health")
+          echo "api=$([ "$live_api" != "$API_TREE" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "web=$([ "$live_web" != "$WEB_TREE" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "no ar: api=$live_api web=$live_web · saindo: api=$API_TREE web=$WEB_TREE"
+
+      # ---- backend primeiro (migrate roda no start da api) ----
+      - name: API → ponteiro :${{ env.TARGET }}
+        if: steps.changed.outputs.api == 'true'
+        run: docker buildx imagetools create -t "$API_IMAGE:$TARGET" "$API_IMAGE:tree-$API_TREE"
+      - name: API → deploy
+        if: steps.changed.outputs.api == 'true'
+        run: curl -fsS -X POST "${{ secrets.EASYPANEL_HOOK_API }}"
+      - name: API → smoke
+        if: steps.changed.outputs.api == 'true'
+        run: .github/scripts/smoke.sh "${{ vars.API_URL }}/health/ready/" "$API_TREE" 300
+      - name: Worker e beat → deploy (mesma imagem da API)
+        if: steps.changed.outputs.api == 'true'
+        run: |
+          if [ -n "${{ secrets.EASYPANEL_HOOK_WORKER }}" ]; then curl -fsS -X POST "${{ secrets.EASYPANEL_HOOK_WORKER }}"; fi
+          if [ -n "${{ secrets.EASYPANEL_HOOK_BEAT }}" ]; then curl -fsS -X POST "${{ secrets.EASYPANEL_HOOK_BEAT }}"; fi
+
+      # ---- depois o web ----
+      - name: Web → ponteiro :${{ env.TARGET }}
+        if: steps.changed.outputs.web == 'true'
+        run: docker buildx imagetools create -t "$WEB_IMAGE:$TARGET" "$WEB_IMAGE:tree-$WEB_TREE"
+      - name: Web → deploy
+        if: steps.changed.outputs.web == 'true'
+        run: curl -fsS -X POST "${{ secrets.EASYPANEL_HOOK_WEB }}"
+      - name: Web → smoke
+        if: steps.changed.outputs.web == 'true'
+        run: |
+          .github/scripts/smoke.sh "${{ vars.WEB_URL }}/health" "$WEB_TREE" 180
+          curl -fsS -o /dev/null "${{ vars.WEB_URL }}/"
+
+      # ---- app nativo: update JS no channel do ambiente ----
+      - uses: actions/setup-node@v4
+        if: steps.changed.outputs.web == 'true' && env.HAS_EXPO == 'true'
+        with: {node-version: 22, cache: npm, cache-dependency-path: app/package-lock.json}
+      - name: EAS Update (${{ env.TARGET == 'prod' && 'production' || 'preview' }})
+        if: steps.changed.outputs.web == 'true' && env.HAS_EXPO == 'true'
+        working-directory: app
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CHANNEL: ${{ env.TARGET == 'prod' && 'production' || 'preview' }}
+          # update JS embute EXPO_PUBLIC_* do momento do update: mesmos valores do perfil EAS
+          EXPO_PUBLIC_APP_ENV: ${{ env.TARGET }}
+          EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
+          EXPO_PUBLIC_RELEASE: ${{ needs.images.outputs.web_tree }}
+        run: |
+          npm ci
+          npx eas-cli update --channel "$CHANNEL" \
+            --message "${{ github.ref_name }} ${GITHUB_SHA::7}" --non-interactive
+
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo "### Deploy $TARGET"
+            echo "| componente | tree | mudou |"
+            echo "|---|---|---|"
+            echo "| api | \`$API_TREE\` | ${{ steps.changed.outputs.api }} |"
+            echo "| web | \`$WEB_TREE\` | ${{ steps.changed.outputs.web }} |"
+            echo ""
+            echo "Rollback: Actions → rollback → $TARGET → tree anterior."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,40 @@
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	root * /srv
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+
+	# Health para o EasyPanel e o smoke do pipeline (release embutido na imagem)
+	handle /health {
+		header Cache-Control "no-store"
+		rewrite * /health.json
+		file_server
+	}
+
+	# Config de runtime (muda por ambiente): nunca cachear
+	handle /config.js {
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	handle {
+		# Assets com hash no nome: cache longo. Todo o resto (HTML das rotas): sempre revalidar.
+		@assets path /_expo/static/* /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@pages not path /_expo/static/* /assets/*
+		header @pages Cache-Control "no-cache"
+
+		# Rotas do Expo Router: /alunos → /alunos.html; fallback para index.html
+		try_files {path} {path}.html {path}/index.html /index.html
+		file_server
+	}
+}
