@@ -45,7 +45,9 @@ Ao abrir o Code Server, o workspace é:
 
 Esse diretório é a raiz deste próprio repositório.
 
-Na primeira abertura de um terminal, o ambiente pede:
+Se `GIT_USER_NAME`, `GIT_USER_EMAIL` e `GH_TOKEN` estiverem definidos no Ambiente do EasyPanel, o Git e o GitHub já sobem configurados (reaplicados a cada inicialização do container). Use um token fine-grained restrito ao repositório do projeto (Contents e Pull requests: read/write). Para trocar o token, altere a variável e reimplante.
+
+Sem essas variáveis, na primeira abertura de um terminal o ambiente pede:
 
 1. nome do Git;
 2. e-mail do Git;

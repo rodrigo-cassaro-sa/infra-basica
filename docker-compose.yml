@@ -139,7 +139,7 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${HOM_GUNICORN_WORKERS:-3} --timeout ${HOM_GUNICORN_TIMEOUT:-60}"
     expose:
       - "8000"
     depends_on:
@@ -169,7 +169,7 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${PROD_GUNICORN_WORKERS:-3} --timeout ${PROD_GUNICORN_TIMEOUT:-60}"
     expose:
       - "8000"
     depends_on:
@@ -245,6 +245,9 @@ services:
       TZ: ${TZ:-America/Sao_Paulo}
       CLAUDE_CONFIG_DIR: /home/coder/.claude
       GIT_CONFIG_GLOBAL: /home/coder/.config/git/config
+      GIT_USER_NAME: ${GIT_USER_NAME:-}
+      GIT_USER_EMAIL: ${GIT_USER_EMAIL:-}
+      GH_TOKEN: ${GH_TOKEN:-}
     volumes:
       - coder_workspace:/home/coder/workspace
       - coder_config:/home/coder/.config
