@@ -3,7 +3,8 @@
 Este repositório é um **molde para cada novo projeto** da software house. A ideia é simples:
 
 ```text
-1 projeto = 1 repositório = 1 Code Server + Django + Expo + DEV/HOM/PROD
+1 projeto = 1 repositório = 3 branches (dev, hom, main) = 3 serviços EasyPanel
+cada serviço = Code Server + Django + Expo + PostgreSQL, mesmo docker-compose.yml
 ```
 
 ## Estrutura
@@ -15,77 +16,52 @@ Este repositório é um **molde para cada novo projeto** da software house. A id
 ├── coder/                 # Code Server + Claude Code + GitHub CLI
 ├── scripts/               # operação/backup
 ├── backups/
-├── docker-compose.dev.yml   # EasyPanel <projeto>-dev  (branch dev)
-├── docker-compose.hom.yml   # EasyPanel <projeto>-hom  (branch hom)
-├── docker-compose.prod.yml  # EasyPanel <projeto>-prod (branch main)
-├── docker-compose.yml       # inclui os três (uso local)
-├── docker-compose.local.yml
-├── .env.example
+├── docker-compose.yml       # o único compose (todos os ambientes)
+├── docker-compose.local.yml # portas para rodar fora do EasyPanel
+├── .env.dev.example         # Ambiente do <projeto>-dev  (branch dev)
+├── .env.hom.example         # Ambiente do <projeto>-hom  (branch hom)
+├── .env.prod.example        # Ambiente do <projeto>-prod (branch main)
 ├── EASYPANEL.md
 └── README.md
 ```
 
 ## Serviços
 
+Cada serviço EasyPanel (um por branch) sobe:
+
 ```text
-DEV
-├── postgres-dev
-├── django-dev
-└── expo-dev (Metro/Web)
-
-HOM
-├── postgres-hom
-├── django-hom
-└── expo-hom (build estático + Nginx)
-
-PROD
-├── postgres-prod
-├── django-prod
-└── expo-prod (build estático + Nginx)
-
-DESENVOLVIMENTO (serviço DEV)
+<projeto>-dev | <projeto>-hom | <projeto>-prod
+├── postgres
+├── django        RUN_MODE=dev: runserver no workspace · server: gunicorn
+├── expo          RUN_MODE=dev: Metro no workspace     · server: build web + Nginx
 └── code-server
-    ├── workspace = /home/coder/workspace
-    ├── Português (Brasil)
-    ├── tema escuro
-    ├── Claude Code
-    ├── Git / GitHub CLI
-    ├── Python
-    ├── Node.js 22
-    ├── pnpm
-    ├── EAS CLI
+    ├── workspace = /home/coder/workspace (cópia da branch)
+    ├── Português (Brasil), tema escuro
+    ├── Claude Code, Git / GitHub CLI
+    ├── Python, Node.js 22, pnpm, EAS CLI
     └── PostgreSQL Client
 ```
 
 ## Primeiro uso no servidor
 
 1. Crie um novo repositório a partir deste template e crie as branches `dev` e `hom` a partir da `main`.
-2. Crie três serviços Compose no EasyPanel (`<projeto>-dev`, `<projeto>-hom`, `<projeto>-prod`), cada um com seu arquivo e sua branch — ver `EASYPANEL.md`.
-3. Use `/` como caminho de build.
-4. Preencha as variáveis de cada ambiente a partir de `.env.example`.
-5. Troque todas as senhas e chaves.
-6. Implante.
-7. Cadastre os domínios conforme `EASYPANEL.md`.
+2. Crie três serviços Compose no EasyPanel (`<projeto>-dev`, `<projeto>-hom`, `<projeto>-prod`), cada um na sua branch, todos com `docker-compose.yml` e caminho de build `/` — ver `EASYPANEL.md`.
+3. No Ambiente de cada serviço, cole o `.env.<ambiente>.example` correspondente.
+4. Troque senhas e chaves (`./scripts/generate-secrets.sh`, uma vez por ambiente) e ajuste os domínios.
+5. Implante.
+6. Cadastre os domínios conforme `EASYPANEL.md`.
 
 ## Primeiro uso local
 
 ```bash
-cp .env.example .env
+cp .env.dev.example .env
 ./scripts/generate-secrets.sh
 # copie os valores gerados para .env
 
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
-Portas locais do override:
-
-- `8080` Code Server
-- `8081` Expo DEV
-- `8082` Expo HOM
-- `8083` Expo PROD
-- `8001` Django DEV
-- `8002` Django HOM
-- `8003` Django PROD
+Portas locais: `8080` Code Server · `8081` Expo · `8000` Django.
 
 ## Code Server
 
@@ -103,7 +79,7 @@ Na primeira abertura do terminal será executada a configuração inicial do Git
 
 ## API de teste
 
-Depois do deploy, cada Django expõe:
+Depois do deploy, o Django de cada ambiente expõe:
 
 ```text
 /api/health/
@@ -131,4 +107,4 @@ PR hom → main → deploy PROD
 
 ## Segurança
 
-Os bancos PostgreSQL não publicam portas no host no Compose principal. Use senhas fortes, restrinja os `ALLOWED_HOSTS` em HOM/PROD e configure os domínios HTTPS no EasyPanel.
+O PostgreSQL não publica porta no host. Use senhas fortes, restrinja os `ALLOWED_HOSTS` em HOM/PROD e configure os domínios HTTPS no EasyPanel.
