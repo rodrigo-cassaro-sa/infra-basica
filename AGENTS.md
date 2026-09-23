@@ -1508,15 +1508,19 @@ PROD
 
 são ambientes.
 
-Não criar automaticamente:
+Neste template, cada ambiente é construído a partir de uma branch própria, por decisão da casa:
 
 ```text
-branch dev
-branch hom
-branch prod
+dev   → DEV
+hom   → HOM
+main  → PROD
 ```
 
-apenas porque existem esses ambientes.
+Promoção: `feat|fix/H-xxx` (a partir de `dev`) → PR para `dev` → PR `dev → hom` → PR `hom → main`.
+Hotfix: `hotfix/slug` a partir de `main` → PR para `main` → back-merge `main → hom → dev`.
+Detalhes do projeto em `docs/deploy.md`, que prevalece sobre o fluxo `develop`/`main` das skills.
+
+Não criar outras branches de ambiente além dessas três.
 
 ---
 
