@@ -10,22 +10,25 @@ name: ${COMPOSE_PROJECT_NAME:-app}
 #   <projeto>-hom   branch hom   → .env.hom.example
 #   <projeto>-prod  branch main  → .env.prod.example
 #
-# Cada serviço sobe Code Server + Django + Expo + PostgreSQL,
-# com rede, volumes e variáveis próprios.
+# Cada serviço sobe Django + Expo + PostgreSQL, com rede,
+# volumes e variáveis próprios. O Code Server (e a cópia do
+# workspace) só sobe com COMPOSE_PROFILES=coder — no DEV.
 #
 # RUN_MODE=dev    Django e Expo rodam o workspace do Code Server
 #                 (runserver + Metro, com recarga automática).
+#                 Exige COMPOSE_PROFILES=coder.
 # RUN_MODE=server Django e Expo rodam o código da branch
 #                 (gunicorn + build web estático no Nginx).
 # ==========================================================
 
 services:
   # ========================================================
-  # WORKSPACE PRIVADO DO CODE SERVER
+  # WORKSPACE PRIVADO DO CODE SERVER (profile "coder")
   # Copia o checkout da branch UMA VEZ para um volume.
   # Nunca altera dono/permissões do repositório do EasyPanel.
   # ========================================================
   workspace-init:
+    profiles: ["coder"]
     image: alpine:3.20
     restart: "no"
     command: >
@@ -94,6 +97,7 @@ services:
     depends_on:
       workspace-init:
         condition: service_completed_successfully
+        required: false
       postgres:
         condition: service_healthy
 
@@ -123,12 +127,14 @@ services:
     depends_on:
       workspace-init:
         condition: service_completed_successfully
+        required: false
 
   # ========================================================
-  # CODE SERVER
+  # CODE SERVER (profile "coder") — só no DEV
   # NUNCA monta ./ como workspace gravável.
   # ========================================================
   code-server:
+    profiles: ["coder"]
     build:
       context: ./coder
       dockerfile: Dockerfile
