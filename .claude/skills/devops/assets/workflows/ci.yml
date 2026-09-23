@@ -1,0 +1,65 @@
+# .github/workflows/ci.yml — gates de PR (OPS-01 §41–43). Bloqueia merge em develop e main.
+# Monorepo: backend/ (Django, família BE) e app/ (Expo). Ajuste os caminhos se diferente.
+name: ci
+on:
+  pull_request:
+    branches: [develop, main]
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: backend}}
+    services:
+      postgres:
+        image: postgres:17
+        env: {POSTGRES_USER: app, POSTGRES_PASSWORD: app, POSTGRES_DB: app}
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U app" --health-interval 5s --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      DJANGO_SECRET_KEY: ci-only-not-secret
+      DATABASE_URL: postgres://app:app@localhost:5432/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Migrations em dia
+        run: uv run python manage.py makemigrations --check --dry-run
+      - name: Testes (Postgres real)
+        run: uv run pytest --cov
+      - name: OpenAPI sem diff (contrato com o app)
+        run: |
+          uv run python manage.py spectacular --file openapi.yaml --validate
+          git diff --exit-code openapi.yaml
+      - name: Check de deploy (settings de hom/prod)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.production
+          DJANGO_ALLOWED_HOSTS: exemplo.com.br
+          APP_ENV: prod
+        run: uv run python manage.py check --deploy --fail-level WARNING
+      - name: Dependências vulneráveis (SEC-01)
+        run: uvx pip-audit || echo "::warning::pip-audit encontrou problemas"
+
+  app:
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: app}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm, cache-dependency-path: app/package-lock.json}
+      - run: npm ci
+      - run: npx expo lint
+      - run: npx tsc --noEmit
+      - run: npm test -- --ci
+      - name: Build web (garante que o deploy vai compilar)
+        run: npx expo export -p web
+        env: {NODE_OPTIONS: --max-old-space-size=4096}
+      - name: Dependências vulneráveis (SEC-01)
+        run: npm audit --omit=dev --audit-level=high || echo "::warning::npm audit encontrou problemas"

@@ -1,0 +1,51 @@
+# .github/workflows/rollback.yml — volta um componente para uma imagem já publicada (tree-…).
+# Não reverte migration (ver references/migrations-e-rollback.md). Depois: git revert via PR.
+name: rollback
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente
+        type: choice
+        options: [hom, prod]
+        required: true
+      component:
+        description: Componente
+        type: choice
+        options: [api, web]
+        required: true
+      tree:
+        description: "Tree hash a restaurar (sem o prefixo tree-; ver resumos dos deploys anteriores)"
+        required: true
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions: {packages: write, contents: read}
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}-${{ inputs.component }}
+      TREE: ${{ inputs.tree }}
+      TARGET: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
+      - name: Imagem existe?
+        run: docker buildx imagetools inspect "$IMAGE:tree-$TREE" >/dev/null
+      - name: Ponteiro :${{ inputs.environment }} → tree-${{ inputs.tree }}
+        run: docker buildx imagetools create -t "$IMAGE:$TARGET" "$IMAGE:tree-$TREE"
+      - name: Deploy e smoke (api)
+        if: inputs.component == 'api'
+        run: |
+          curl -fsS -X POST "${{ secrets.EASYPANEL_HOOK_API }}"
+          .github/scripts/smoke.sh "${{ vars.API_URL }}/health/ready/" "$TREE" 300
+          if [ -n "${{ secrets.EASYPANEL_HOOK_WORKER }}" ]; then curl -fsS -X POST "${{ secrets.EASYPANEL_HOOK_WORKER }}"; fi
+          if [ -n "${{ secrets.EASYPANEL_HOOK_BEAT }}" ]; then curl -fsS -X POST "${{ secrets.EASYPANEL_HOOK_BEAT }}"; fi
+      - name: Deploy e smoke (web)
+        if: inputs.component == 'web'
+        run: |
+          curl -fsS -X POST "${{ secrets.EASYPANEL_HOOK_WEB }}"
+          .github/scripts/smoke.sh "${{ vars.WEB_URL }}/health" "$TREE" 180
+      - run: echo "Rollback de ${{ inputs.component }} em ${{ inputs.environment }} para tree-$TREE. Abra o revert via PR." >> "$GITHUB_STEP_SUMMARY"

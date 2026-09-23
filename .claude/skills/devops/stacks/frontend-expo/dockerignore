@@ -1,0 +1,12 @@
+# salvar como app/.dockerignore
+node_modules
+dist
+web-build
+.expo
+android
+ios
+.env
+.env.*
+!.env.example
+coverage
+.git

@@ -1,0 +1,29 @@
+{
+  "skill_name": "backend-ai-mcp",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Preciso classificar automaticamente as mensagens que chegam pelo app em suporte, comercial ou financeiro, usando um LLM. Como estruturo isso no nosso backend Django?",
+      "expected_output": "AI service message_classify(*, actor, text) em apps/ai/services.py com require_perm e tenant do actor, provider resolvido por AI_PROVIDERS/AI_MODELS, prompt versionado, schema Pydantic, validação de saída, AIRun gravado por ai_run_* com correlation_id, erros MAIÚSCULOS na hierarquia common.errors, endpoint DRF que não expõe o provider, testes com FakeLLMProvider incluindo JSON inválido.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Vamos fazer uma busca por documentos com IA para cada cliente ver os contratos dele. Pensei em jogar tudo num índice e pedir pro modelo só responder sobre o cliente certo. Faz sentido?",
+      "expected_output": "Recusa clara do desenho proposto: filtro de tenant por SQL antes do retrieval, metadata com tenant_id e permission_scope, pgvector, teste de vazamento entre tenants, selector chunk_retrieve_for(actor=...) com scope_to_tenant, tratamento de AI_INSUFFICIENT_CONTEXT e citações.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Quero expor nosso backend via MCP pra um assistente de IA conseguir consultar e atualizar oportunidades do CRM. Por onde começo?",
+      "expected_output": "App apps/mcp separado, SDK oficial com versão fixada, tools delegando a services/selectors do core com actor=principal.user (sem tenant_id solto), autorização via require_perm do core, read-only primeiro, write tools atrás de feature flag e PendingAction para ação sensível, erros como exc.to_dict(), Streamable HTTP com HTTPS/auth/rate limiting, checklist de MCP Server.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Revisa esse PR: a view chama openai.chat.completions.create direto com o prompt em f-string, salva o texto da resposta no campo categoria e tem um retry de 3 tentativas em qualquer exceção.",
+      "expected_output": "Aponta IA na view, SDK no domínio, prompt não versionado, ausência de output estruturado e validação, persistência de dado não validado, retry indiscriminado em erro permanente, falta de timeout e de AIRun. Sugere AITransientError/AIPermanentError (common.errors) e retry só de TransientError na task.",
+      "files": []
+    }
+  ]
+}

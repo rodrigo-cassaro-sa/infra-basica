@@ -75,6 +75,12 @@ make backup-dev | backup-hom | backup-prod   # pg_dump para backups/
 
 Health checks: Django em `/api/health/`, Nginx do Expo em `/healthz`, Code Server em `/healthz`.
 
+## Skills do template
+
+`.claude/skills/` traz as skills genéricas de desenvolvimento da casa (versionadas no template, herdadas por todo projeto novo): backend Django (`backend-core`, `backend-api`, `backend-async`, `backend-integrations`, `backend-ai-mcp`), frontend Expo (`expo-app`, `ux-ui`, `frontend-web`), método DAH (`dah-historia`, `dah-documentacao`, `project-governance`, `artifact-analysis`) e transversais (`security`, `testing-quality`, `devops`, `git-deploy`). Skills específicas de um aplicativo ficam só no repositório do app.
+
+Atenção: `devops` e `git-deploy` descrevem um fluxo com imagens no GHCR, GitHub Actions e branches `develop`→HOM / `main`→PROD. Este template hoje faz o build de todos os ambientes a partir do checkout do EasyPanel, em um único Compose. Ao seguir essas skills, confirmar com o usuário qual modelo de deploy vale para o projeto.
+
 ## Segurança / operação
 
 - Os PostgreSQL não publicam portas no Compose principal.
