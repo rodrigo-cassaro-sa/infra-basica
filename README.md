@@ -4,7 +4,7 @@ Este repositório é um **molde para cada novo projeto** da software house. A id
 
 ```text
 1 projeto = 1 repositório = 3 branches (dev, hom, main) = 3 serviços EasyPanel
-cada serviço = Code Server + Django + Expo + PostgreSQL, mesmo docker-compose.yml
+cada serviço = Django + Expo + PostgreSQL (+ Code Server no dev), mesmo docker-compose.yml
 ```
 
 ## Estrutura
@@ -34,8 +34,8 @@ Cada serviço EasyPanel (um por branch) sobe:
 ├── postgres
 ├── django        RUN_MODE=dev: runserver no workspace · server: gunicorn
 ├── expo          RUN_MODE=dev: Metro no workspace     · server: build web + Nginx
-└── code-server
-    ├── workspace = /home/coder/workspace (cópia da branch)
+└── code-server   só no <projeto>-dev (COMPOSE_PROFILES=coder)
+    ├── workspace = /home/coder/workspace (cópia da branch dev)
     ├── Português (Brasil), tema escuro
     ├── Claude Code, Git / GitHub CLI
     ├── Python, Node.js 22, pnpm, EAS CLI

@@ -18,7 +18,7 @@
 ## Ambientes
 
 Um serviço Compose no EasyPanel por branch, todos com o mesmo `docker-compose.yml`.
-Cada um sobe Code Server + Django + Expo + PostgreSQL, com rede, volumes e variáveis próprios.
+Cada um sobe Django + Expo + PostgreSQL, com rede, volumes e variáveis próprios. O Code Server sobe só no dev (`COMPOSE_PROFILES=coder`).
 A diferença entre ambientes é só o Ambiente do serviço (modelos: `.env.dev.example`, `.env.hom.example`, `.env.prod.example`).
 
 | | dev | hom | prod |
@@ -29,18 +29,18 @@ A diferença entre ambientes é só o Ambiente do serviço (modelos: `.env.dev.e
 | Settings | `config.settings.development` | `config.settings.homologation` | `config.settings.production` |
 | API | https://[api-dev-projeto.dominio] | https://[api-hom-projeto.dominio] | https://[api-projeto.dominio] |
 | Web | https://[dev-projeto.dominio] | https://[hom-projeto.dominio] | https://[projeto.dominio] |
-| Code Server | https://[coder-dev-projeto.dominio] | https://[coder-hom-projeto.dominio] | https://[coder-projeto.dominio] |
+| Code Server | https://[coder-projeto.dominio] | — (desligado) | — (desligado) |
 | App nativo (EAS profile) | development | preview | production |
 | Aprovação | automático | PENDENTE | PENDENTE |
 
-## Serviços (iguais nos três ambientes)
+## Serviços
 
 | Serviço | Origem | Porta interna | Health |
 |---|---|---|---|
 | `django` | build de `backend/`; `RUN_MODE` escolhe runserver ou gunicorn | 8000 | `/api/health/` |
 | `expo` | build de `frontend/` (alvo `dev` = Metro, `server` = Nginx) | 8081 | `/healthz` (em `server`) |
 | `postgres` | `postgres:17-alpine` | 5432 (sem domínio) | `pg_isready` |
-| `code-server` | build de `coder/` | 8080 | `/healthz` |
+| `code-server` (só dev, profile `coder`) | build de `coder/` | 8080 | `/healthz` |
 
 ## Pipeline
 
@@ -69,7 +69,7 @@ A diferença entre ambientes é só o Ambiente do serviço (modelos: `.env.dev.e
 
 | Nome da env | Serviço | Ambiente | Dono | Expira |
 |---|---|---|---|---|
-| `GH_TOKEN` | GitHub (Code Server) | dev · hom · prod | [ ] | [ ] |
+| `GH_TOKEN` | GitHub (Code Server) | dev | [ ] | [ ] |
 
 ## DNS
 
