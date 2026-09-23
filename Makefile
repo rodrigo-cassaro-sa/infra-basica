@@ -1,4 +1,4 @@
-.PHONY: up down ps logs backup-dev backup-hom backup-prod health
+.PHONY: up down ps logs backup health
 up:
 	docker compose up -d --build
 
@@ -11,14 +11,8 @@ ps:
 logs:
 	docker compose logs -f --tail=200
 
-backup-dev:
-	./scripts/backup.sh dev
-
-backup-hom:
-	./scripts/backup.sh hom
-
-backup-prod:
-	./scripts/backup.sh prod
+backup:
+	./scripts/backup.sh
 
 health:
 	./scripts/health-check.sh
