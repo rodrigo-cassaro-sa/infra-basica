@@ -1,0 +1,25 @@
+# Override opcional para testes fora do EasyPanel.
+# Uso:
+# docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+services:
+  django-dev:
+    ports:
+      - "8001:8000"
+  django-hom:
+    ports:
+      - "8002:8000"
+  django-prod:
+    ports:
+      - "8003:8000"
+  expo-dev:
+    ports:
+      - "8081:8081"
+  expo-hom:
+    ports:
+      - "8082:80"
+  expo-prod:
+    ports:
+      - "8083:80"
+  code-server:
+    ports:
+      - "8080:8080"
