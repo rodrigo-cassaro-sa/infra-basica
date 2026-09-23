@@ -1,6 +1,6 @@
 # ==========================================================
 # AMBIENTE DEV — Code Server + Django DEV + Expo DEV
-# EasyPanel: serviço Compose "<projeto>-dev", branch develop.
+# EasyPanel: serviço Compose "<projeto>-dev", branch dev.
 # O código do DEV é o workspace do Code Server (volume
 # coder_workspace), não o checkout do EasyPanel: a branch só
 # alimenta a cópia inicial do workspace.

@@ -8,26 +8,27 @@ Crie **três serviços Compose** no EasyPanel, todos apontando para o repositór
 
 | Serviço EasyPanel | Branch | Arquivo Compose | Serviços |
 |---|---|---|---|
-| `<projeto>-dev` | `develop` | `docker-compose.dev.yml` | `code-server`, `django-dev`, `expo-dev`, `postgres-dev` |
-| `<projeto>-hom` | `develop` | `docker-compose.hom.yml` | `django-hom`, `expo-hom`, `postgres-hom` |
+| `<projeto>-dev` | `dev` | `docker-compose.dev.yml` | `code-server`, `django-dev`, `expo-dev`, `postgres-dev` |
+| `<projeto>-hom` | `hom` | `docker-compose.hom.yml` | `django-hom`, `expo-hom`, `postgres-hom` |
 | `<projeto>-prod` | `main` | `docker-compose.prod.yml` | `django-prod`, `expo-prod`, `postgres-prod` |
 
 - Cada serviço tem rede, volumes e variáveis próprios: um deploy de HOM nunca toca PROD.
-- **HOM** recebe o que foi mesclado em `develop`. Ative o deploy automático (webhook do GitHub) se quiser que cada merge em `develop` atualize HOM.
-- **PROD** só muda com o release PR `develop → main` aprovado e o deploy de `<projeto>-prod`. Recomendado: deploy manual em PROD.
-- **DEV** roda o código do workspace do Code Server (volume `coder_workspace`), não o checkout. A branch só alimenta a cópia inicial do workspace; depois o trabalho acontece em branches `feat/H-xxx-*` criadas a partir de `develop` dentro do Code Server.
+- **HOM** recebe só a promoção por PR `dev → hom`. Ative o deploy automático (webhook do GitHub) se quiser que cada merge em `hom` atualize HOM.
+- **PROD** só muda com o PR `hom → main`, depois da homologação e da aprovação de publicação, e o deploy de `<projeto>-prod`. Recomendado: deploy manual em PROD.
+- **DEV** roda o código do workspace do Code Server (volume `coder_workspace`), não o checkout. A branch só alimenta a cópia inicial do workspace; depois o trabalho acontece em branches `feat/H-xxx-*` criadas a partir de `dev` dentro do Code Server.
 - O `docker-compose.yml` inclui os três arquivos e serve para rodar tudo junto localmente.
 
 ### Branches
 
-Depois de criar o repositório do projeto a partir do template, crie a `develop` a partir da `main` e deixe-a como branch padrão:
+Uma branch por ambiente: `dev` → DEV, `hom` → HOM, `main` → PROD. Depois de criar o repositório do projeto a partir do template, crie `dev` e `hom` a partir da `main` e deixe `dev` como branch padrão:
 
 ```bash
-git switch -c develop && git push -u origin develop
-gh repo edit --default-branch develop
+git switch -c hom && git push -u origin hom
+git switch -c dev && git push -u origin dev
+gh repo edit --default-branch dev
 ```
 
-Proteja `main` e `develop` (merge só por PR). Fluxo completo na skill `git-deploy`.
+Proteja `main`, `hom` e `dev` (merge só por PR). Promoção: `feat|fix/H-xxx` → `dev` → `hom` → `main`. Hotfix sai de `main` e volta por back-merge para `hom` e `dev`.
 
 ## Variáveis
 

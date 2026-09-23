@@ -1,7 +1,7 @@
 # ==========================================================
 # AMBIENTE HOM — homologação
-# EasyPanel: serviço Compose "<projeto>-hom", branch develop.
-# Chega aqui o que foi mesclado em develop.
+# EasyPanel: serviço Compose "<projeto>-hom", branch hom.
+# Chega aqui só a promoção dev → hom.
 # ==========================================================
 
 services:
