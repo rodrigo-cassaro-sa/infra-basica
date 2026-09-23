@@ -1,14 +1,14 @@
 # EasyPanel
 
-Cada projeto usa **três serviços Compose no EasyPanel, um por branch**, todos com o mesmo `docker-compose.yml`. Cada serviço sobe o conjunto completo — Code Server, Django, Expo e PostgreSQL — e o que muda entre eles é só o Ambiente (`.env`).
+Cada projeto usa **três serviços Compose no EasyPanel, um por branch**, todos com o mesmo `docker-compose.yml`. Cada serviço sobe Django, Expo e PostgreSQL; o `<projeto>-dev` sobe também o Code Server. O que muda entre eles é só o Ambiente (`.env`).
 
 ## Serviços
 
-| Serviço EasyPanel | Branch | Ambiente (modelo) | `RUN_MODE` |
-|---|---|---|---|
-| `<projeto>-dev` | `dev` | `.env.dev.example` | `dev` |
-| `<projeto>-hom` | `hom` | `.env.hom.example` | `server` |
-| `<projeto>-prod` | `main` | `.env.prod.example` | `server` |
+| Serviço EasyPanel | Branch | Ambiente (modelo) | `RUN_MODE` | Code Server |
+|---|---|---|---|---|
+| `<projeto>-dev` | `dev` | `.env.dev.example` | `dev` | sim (`COMPOSE_PROFILES=coder`) |
+| `<projeto>-hom` | `hom` | `.env.hom.example` | `server` | não |
+| `<projeto>-prod` | `main` | `.env.prod.example` | `server` | não |
 
 Em todos:
 
@@ -22,7 +22,7 @@ Cada serviço tem rede, volumes e variáveis próprios: um deploy de HOM nunca t
 ## O que `RUN_MODE` muda
 
 - `dev`: Django (`runserver`) e Expo (Metro) rodam o **workspace do Code Server**. Editou, aparece na hora.
-- `server`: Django (gunicorn) e Expo (build web + Nginx) rodam o **código da branch**, construído no deploy. Editar no Code Server desse ambiente não muda o que está no ar: é preciso commit, PR para a branch e redeploy.
+- `server`: Django (gunicorn) e Expo (build web + Nginx) rodam o **código da branch**, construído no deploy. Só mudam com PR para a branch e redeploy.
 
 ## Branches
 
@@ -45,7 +45,7 @@ Os nomes dos serviços são os mesmos nos três ambientes:
 
 | Uso | Serviço Compose | Porta interna |
 |---|---|---:|
-| Code Server | `code-server` | `8080` |
+| Code Server (só DEV) | `code-server` | `8080` |
 | App Web | `expo` | `8081` |
 | API | `django` | `8000` |
 
@@ -53,25 +53,27 @@ Exemplo:
 
 | | `<projeto>-dev` | `<projeto>-hom` | `<projeto>-prod` |
 |---|---|---|---|
-| Code Server | `coder-dev-projeto.seudominio.com` | `coder-hom-projeto.seudominio.com` | `coder-projeto.seudominio.com` |
+| Code Server | `coder-projeto.seudominio.com` | — | — |
 | App Web | `dev-projeto.seudominio.com` | `hom-projeto.seudominio.com` | `projeto.seudominio.com` |
 | API | `api-dev-projeto.seudominio.com` | `api-hom-projeto.seudominio.com` | `api-projeto.seudominio.com` |
 
 No destino do domínio use **HTTP**; o EasyPanel/Traefik termina o HTTPS externamente. O domínio da API vai em `API_URL` e `DJANGO_ALLOWED_HOSTS`; o do App Web em `CORS_ALLOWED_ORIGINS`.
 
-## Code Server
+## Code Server (só no DEV)
 
-Ao abrir o Code Server, o workspace é `/home/coder/workspace`: uma cópia privada da branch do serviço (ver `WORKSPACE-EASYPANEL.md`).
+O Code Server e a cópia do workspace estão no profile `coder` do compose, ligado só no `<projeto>-dev` (`COMPOSE_PROFILES=coder`). Em HOM e PROD `COMPOSE_PROFILES` fica vazio e eles não sobem.
+
+Ao abrir o Code Server, o workspace é `/home/coder/workspace`: uma cópia privada da branch `dev` (ver `WORKSPACE-EASYPANEL.md`).
 
 Se `GIT_USER_NAME`, `GIT_USER_EMAIL` e `GH_TOKEN` estiverem definidos no Ambiente, o Git e o GitHub já sobem configurados (reaplicados a cada inicialização do container). Use um token fine-grained restrito ao repositório do projeto (Contents e Pull requests: read/write). Para trocar o token, altere a variável e reimplante.
 
 Sem essas variáveis, na primeira abertura de um terminal o ambiente pede nome e e-mail do Git e faz o login no GitHub via `gh auth login`.
 
-O Code Server de HOM e de PROD alcança o banco do próprio ambiente pela rede interna: use `CODER_PASSWORD` forte e restrinja quem tem o domínio.
+Ligar o Code Server em HOM ou PROD é exceção (diagnóstico): ele alcança o banco do ambiente pela rede interna. Nesse caso use `CODER_PASSWORD` forte e desligue ao terminar.
 
 ## Claude Code
 
-A configuração do Claude é persistida no volume `coder_claude` de cada ambiente. O entrypoint corrige as permissões automaticamente e mantém `.claude.json` dentro desse volume por meio de um link simbólico.
+A configuração do Claude é persistida no volume `coder_claude` do DEV. O entrypoint corrige as permissões automaticamente e mantém `.claude.json` dentro desse volume por meio de um link simbólico.
 
 ## Observação sobre Expo
 
