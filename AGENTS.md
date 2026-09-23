@@ -1120,7 +1120,7 @@ Pode existir em:
 | `frontend/` | `expo-app` — Android, iOS e Web a partir da mesma base |
 
 `expo-app` é a única stack de frontend da casa. O web sai de `frontend/` por
-`expo export --platform web`, que é o que `frontend/Dockerfile.web` constrói. Por isso
+`expo export --platform web`, que é o que o alvo `server` de `frontend/Dockerfile` constrói. Por isso
 o campo **plataforma** de cada tela em `mapa-de-telas.md` — `web`, `aplicativo` ou
 `ambas` — decide o alvo do build, não a skill: ela é sempre a mesma.
 
