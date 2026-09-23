@@ -15,8 +15,8 @@ Este repositório é um **molde para cada novo projeto** da software house. A id
 ├── coder/                 # Code Server + Claude Code + GitHub CLI
 ├── scripts/               # operação/backup
 ├── backups/
-├── docker-compose.dev.yml   # EasyPanel <projeto>-dev  (branch develop)
-├── docker-compose.hom.yml   # EasyPanel <projeto>-hom  (branch develop)
+├── docker-compose.dev.yml   # EasyPanel <projeto>-dev  (branch dev)
+├── docker-compose.hom.yml   # EasyPanel <projeto>-hom  (branch hom)
 ├── docker-compose.prod.yml  # EasyPanel <projeto>-prod (branch main)
 ├── docker-compose.yml       # inclui os três (uso local)
 ├── docker-compose.local.yml
@@ -59,7 +59,7 @@ DESENVOLVIMENTO (serviço DEV)
 
 ## Primeiro uso no servidor
 
-1. Crie um novo repositório a partir deste template e crie a branch `develop` a partir da `main`.
+1. Crie um novo repositório a partir deste template e crie as branches `dev` e `hom` a partir da `main`.
 2. Crie três serviços Compose no EasyPanel (`<projeto>-dev`, `<projeto>-hom`, `<projeto>-prod`), cada um com seu arquivo e sua branch — ver `EASYPANEL.md`.
 3. Use `/` como caminho de build.
 4. Preencha as variáveis de cada ambiente a partir de `.env.example`.
@@ -116,17 +116,17 @@ O fluxo esperado é:
 ```text
 Template
    ↓
-Novo repositório (main + develop)
+Novo repositório (dev + hom + main)
    ↓
 EasyPanel: <projeto>-dev, <projeto>-hom, <projeto>-prod
    ↓
 Code Server daquele projeto
    ↓
-Desenvolvimento DEV (branch feat/H-xxx a partir de develop)
+Desenvolvimento DEV (branch feat/H-xxx a partir de dev) → PR para dev
    ↓
-PR → develop → deploy HOM → validação
+PR dev → hom → deploy HOM → homologação
    ↓
-Release PR develop → main → deploy PROD
+PR hom → main → deploy PROD
 ```
 
 ## Segurança
