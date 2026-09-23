@@ -42,4 +42,23 @@ chown -R coder:coder \
 
 chmod 700 "$CODER_HOME/.ssh" || true
 
+# Git/GitHub a partir das variáveis de ambiente (EasyPanel/.env).
+# Sem as variáveis, o git-bootstrap.sh pergunta no primeiro terminal.
+as_coder() { gosu coder env HOME="$CODER_HOME" "$@"; }
+
+if [ -n "${GIT_USER_NAME:-}" ]; then
+  as_coder git config --global user.name "$GIT_USER_NAME"
+fi
+if [ -n "${GIT_USER_EMAIL:-}" ]; then
+  as_coder git config --global user.email "$GIT_USER_EMAIL"
+fi
+as_coder git config --global init.defaultBranch main
+as_coder git config --global pull.rebase false
+as_coder git config --global core.autocrlf input
+
+# O gh lê GH_TOKEN do ambiente; o Git passa a usar o gh como credential helper.
+if [ -n "${GH_TOKEN:-}" ]; then
+  as_coder gh auth setup-git --hostname github.com || true
+fi
+
 exec gosu coder code-server "$@"

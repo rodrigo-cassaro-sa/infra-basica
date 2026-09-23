@@ -1,19 +1,22 @@
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "não configurada";
 
 export default function App() {
   return (
-    <SafeAreaView style={styles.page}>
-      <StatusBar style="light" />
-      <View style={styles.card}>
-        <Text style={styles.title}>Projeto pronto</Text>
-        <Text style={styles.text}>Expo + Django + PostgreSQL</Text>
-        <Text style={styles.label}>API</Text>
-        <Text style={styles.code}>{apiUrl}</Text>
-      </View>
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.page}>
+        <StatusBar style="light" />
+        <View style={styles.card}>
+          <Text style={styles.title}>Projeto pronto</Text>
+          <Text style={styles.text}>Expo + Django + PostgreSQL</Text>
+          <Text style={styles.label}>API</Text>
+          <Text style={styles.code}>{apiUrl}</Text>
+        </View>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

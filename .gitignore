@@ -29,3 +29,9 @@ web-build/
 backups/*.sql
 backups/*.dump
 !backups/.gitkeep
+
+# Gerado pelo EasyPanel
+docker-compose.override.yml
+
+# Claude Code (configuração pessoal)
+.claude/settings.local.json
