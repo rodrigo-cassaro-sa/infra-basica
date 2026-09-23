@@ -1,20 +1,174 @@
 name: ${COMPOSE_PROJECT_NAME:-app}
 
 # ==========================================================
-# TODOS OS AMBIENTES JUNTOS — uso local
+# UM COMPOSE PARA TODOS OS AMBIENTES
 #
-# No EasyPanel cada ambiente é um serviço Compose próprio,
-# apontando para o arquivo e a branch do ambiente:
+# No EasyPanel, crie um serviço Compose por branch, todos com
+# este mesmo arquivo. O que muda é só o Ambiente (.env):
 #
-#   <projeto>-dev   docker-compose.dev.yml    branch dev
-#   <projeto>-hom   docker-compose.hom.yml    branch hom
-#   <projeto>-prod  docker-compose.prod.yml   branch main
+#   <projeto>-dev   branch dev   → .env.dev.example
+#   <projeto>-hom   branch hom   → .env.hom.example
+#   <projeto>-prod  branch main  → .env.prod.example
 #
-# Local:
-#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+# Cada serviço sobe Code Server + Django + Expo + PostgreSQL,
+# com rede, volumes e variáveis próprios.
+#
+# RUN_MODE=dev    Django e Expo rodam o workspace do Code Server
+#                 (runserver + Metro, com recarga automática).
+# RUN_MODE=server Django e Expo rodam o código da branch
+#                 (gunicorn + build web estático no Nginx).
 # ==========================================================
 
-include:
-  - docker-compose.dev.yml
-  - docker-compose.hom.yml
-  - docker-compose.prod.yml
+services:
+  # ========================================================
+  # WORKSPACE PRIVADO DO CODE SERVER
+  # Copia o checkout da branch UMA VEZ para um volume.
+  # Nunca altera dono/permissões do repositório do EasyPanel.
+  # ========================================================
+  workspace-init:
+    image: alpine:3.20
+    restart: "no"
+    command: >
+      sh -c '
+        set -eu;
+        if [ ! -d /workspace/.git ]; then
+          echo "Inicializando workspace privado...";
+          cp -a /seed/. /workspace/;
+        else
+          echo "Workspace já inicializado; mantendo alterações locais.";
+        fi;
+        chown -R 1000:1000 /workspace;
+      '
+    volumes:
+      - ./:/seed:ro
+      - coder_workspace:/workspace
+
+  # ========================================================
+  # POSTGRESQL
+  # Sem porta publicada: só a rede interna do ambiente.
+  # ========================================================
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-app}
+      POSTGRES_USER: ${DB_USER:-app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-me}
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app} -d ${DB_NAME:-app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ========================================================
+  # DJANGO
+  # O modo (runserver no workspace ou gunicorn) é escolhido
+  # por RUN_MODE em backend/docker-entrypoint.sh.
+  # ========================================================
+  django:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      RUN_MODE: ${RUN_MODE:-server}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.production}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-change-me}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-app}
+      DB_USER: ${DB_USER:-app}
+      DB_PASSWORD: ${DB_PASSWORD:-change-me}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-60}
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - coder_workspace:/workspace
+    expose:
+      - "8000"
+    depends_on:
+      workspace-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  # ========================================================
+  # EXPO
+  # RUN_MODE=dev    → alvo "dev" do Dockerfile (Metro no workspace)
+  # RUN_MODE=server → alvo "server" (expo export + Nginx)
+  # Nos dois casos o serviço responde na porta 8081.
+  # ========================================================
+  expo:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: ${RUN_MODE:-server}
+      args:
+        EXPO_PUBLIC_API_URL: ${API_URL:-}
+    restart: unless-stopped
+    environment:
+      CI: "1"
+      EXPO_PUBLIC_API_URL: ${API_URL:-}
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - coder_workspace:/workspace
+      - expo_node_modules:/workspace/frontend/node_modules
+    expose:
+      - "8081"
+    depends_on:
+      workspace-init:
+        condition: service_completed_successfully
+
+  # ========================================================
+  # CODE SERVER
+  # NUNCA monta ./ como workspace gravável.
+  # ========================================================
+  code-server:
+    build:
+      context: ./coder
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      PASSWORD: ${CODER_PASSWORD:-change-me-coder}
+      TZ: ${TZ:-America/Sao_Paulo}
+      CLAUDE_CONFIG_DIR: /home/coder/.claude
+      GIT_CONFIG_GLOBAL: /home/coder/.config/git/config
+      GIT_USER_NAME: ${GIT_USER_NAME:-}
+      GIT_USER_EMAIL: ${GIT_USER_EMAIL:-}
+      GH_TOKEN: ${GH_TOKEN:-}
+    volumes:
+      - coder_workspace:/home/coder/workspace
+      - coder_config:/home/coder/.config
+      - coder_local:/home/coder/.local
+      - coder_claude:/home/coder/.claude
+      - coder_ssh:/home/coder/.ssh
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      workspace-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  expo_node_modules:
+
+  # Workspace privado do Code Server.
+  coder_workspace:
+
+  # Preferências, extensões e autenticações persistentes.
+  coder_config:
+  coder_local:
+  coder_claude:
+  coder_ssh:

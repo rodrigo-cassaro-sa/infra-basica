@@ -17,29 +17,29 @@
 
 ## Ambientes
 
-Um serviço Compose no EasyPanel por ambiente, cada um com rede, volumes e variáveis próprios.
-Variáveis no Ambiente de cada serviço, com prefixo `DEV_` / `HOM_` / `PROD_` (modelo em `.env.example`).
+Um serviço Compose no EasyPanel por branch, todos com o mesmo `docker-compose.yml`.
+Cada um sobe Code Server + Django + Expo + PostgreSQL, com rede, volumes e variáveis próprios.
+A diferença entre ambientes é só o Ambiente do serviço (modelos: `.env.dev.example`, `.env.hom.example`, `.env.prod.example`).
 
 | | dev | hom | prod |
 |---|---|---|---|
 | Serviço EasyPanel | `[projeto]-dev` | `[projeto]-hom` | `[projeto]-prod` |
-| Arquivo Compose | `docker-compose.dev.yml` | `docker-compose.hom.yml` | `docker-compose.prod.yml` |
-| Branch | `dev` (só a cópia inicial) | `hom` | `main` |
-| Código | workspace do Code Server (volume `coder_workspace`) | checkout de `hom` | checkout de `main` |
+| Branch | `dev` | `hom` | `main` |
+| `RUN_MODE` | `dev` (workspace do Code Server) | `server` (checkout de `hom`) | `server` (checkout de `main`) |
+| Settings | `config.settings.development` | `config.settings.homologation` | `config.settings.production` |
 | API | https://[api-dev-projeto.dominio] | https://[api-hom-projeto.dominio] | https://[api-projeto.dominio] |
 | Web | https://[dev-projeto.dominio] | https://[hom-projeto.dominio] | https://[projeto.dominio] |
-| Code Server | https://[coder-projeto.dominio] | — | — |
+| Code Server | https://[coder-dev-projeto.dominio] | https://[coder-hom-projeto.dominio] | https://[coder-projeto.dominio] |
 | App nativo (EAS profile) | development | preview | production |
 | Aprovação | automático | PENDENTE | PENDENTE |
 
-## Serviços por ambiente
+## Serviços (iguais nos três ambientes)
 
 | Serviço | Origem | Porta interna | Health |
 |---|---|---|---|
-| `django-dev` / `django-hom` / `django-prod` | build de `backend/` | 8000 | `/api/health/` |
-| `expo-dev` | Metro sobre o workspace | 8081 | — |
-| `expo-hom` / `expo-prod` | build de `frontend/` (`Dockerfile.web`) + Nginx | 80 | `/healthz` |
-| `postgres-dev` / `postgres-hom` / `postgres-prod` | `postgres:17-alpine` | 5432 (sem domínio) | `pg_isready` |
+| `django` | build de `backend/`; `RUN_MODE` escolhe runserver ou gunicorn | 8000 | `/api/health/` |
+| `expo` | build de `frontend/` (alvo `dev` = Metro, `server` = Nginx) | 8081 | `/healthz` (em `server`) |
+| `postgres` | `postgres:17-alpine` | 5432 (sem domínio) | `pg_isready` |
 | `code-server` | build de `coder/` | 8080 | `/healthz` |
 
 ## Pipeline
@@ -61,7 +61,7 @@ Variáveis no Ambiente de cada serviço, com prefixo `DEV_` / `HOM_` / `PROD_` (
 
 ## Dados e recuperação
 
-- Backup: `make backup-dev|hom|prod` (pg_dump para `backups/`) · destino off-site: PENDENTE · frequência: PENDENTE · retenção: PENDENTE
+- Backup: `make backup` no ambiente (pg_dump para `backups/`) · destino off-site: PENDENTE · frequência: PENDENTE · retenção: PENDENTE
 - RPO: PENDENTE · RTO: PENDENTE · último restore testado: PENDENTE
 - Dados de hom: PENDENTE (seed sintético ou cópia anonimizada — nunca cópia crua de prod)
 
@@ -69,7 +69,7 @@ Variáveis no Ambiente de cada serviço, com prefixo `DEV_` / `HOM_` / `PROD_` (
 
 | Nome da env | Serviço | Ambiente | Dono | Expira |
 |---|---|---|---|---|
-| `GH_TOKEN` | GitHub (Code Server) | dev | [ ] | [ ] |
+| `GH_TOKEN` | GitHub (Code Server) | dev · hom · prod | [ ] | [ ] |
 
 ## DNS
 
